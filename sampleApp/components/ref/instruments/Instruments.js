@@ -1,8 +1,8 @@
-iimport React from 'react';
+import React from 'react';
 import { bindHandlers } from 'react-bind-handlers';
 import { ButtonToolbar } from 'react-bootstrap';
 import { noop } from 'lodash';
-import API from '../../utils/API';
+import refDataAPI from '../refDataAPI';
 import Instrument from './InstrumentTemplates'
 
 const AllAssetTypes = [
@@ -38,22 +38,25 @@ class Instruments extends React.PureComponent {
       clear instrument list for UI
     */
     this.instruments = [];
+    // notify if any UI component using it and want to listen to asset change
+    if (this.props.onAssetTypeSelected) {
+      this.props.onAssetTypeSelected(eventKey);
+    }
     /* Open API 
       first set parameters as required, e.g AssetTypes below
-      then call to open api, API.getInstruments for more details
+      then call to open api, see API.getInstruments for more details
     */
     this.instrumentsRequestParams.AssetTypes = eventKey;
-    API.getInstruments(this.instrumentsRequestParams,
-     result => this.onSuccess(result, eventKey),
-     result => console.log(result),
+    refDataAPI.getInstruments(this.instrumentsRequestParams,
+     result => this.getInstrumentSuccess(result),
+     result => console.log(result)
     );
   }
 
   // success callback for API.getInstruments
-  onSuccess(result, eventKey) {
-    // notify if any UI component using it and want to listen to asset change
-    if (this.props.onAssetTypeSelected) {
-      this.props.onAssetTypeSelected(eventKey, result.Data);
+  getInstrumentSuccess(result) {
+    if (this.props.onGetInstruments) {
+      this.props.onGetInstruments(result.Data);
     }
     // show instruments on UI.
     this.instruments = result.Data;
@@ -62,9 +65,26 @@ class Instruments extends React.PureComponent {
   }
 
   // action when user select instrument
-  handleInstrumentSelection(eventKey) {
-    // notify if any UI component using it and want to listen to asset change
-    this.props.onInstrumentSelected(eventKey);
+  handleInstrumentSelection(instrument) {
+      /* Open API 
+        first set parameters as required, e.g AssetTypes & Uic
+        then call to open api, see API.getInstruments for more details
+      */
+      var instrumentDetailsRequestParams = { Uic: instrument.Identifier, AssetType: instrument.AssetType }
+      refDataAPI.getInstrumentDetails(instrumentDetailsRequestParams,
+      result => this.getInstrumentDetailsCallBack(instrument, result),  //success callback
+      result => this.getInstrumentDetailsCallBack(instrument, result) // error callback. Please note for Options, you will always land here. See OptionInstruments.jsx file.
+      );
+    }
+  
+
+  getInstrumentDetailsCallBack(instrument, instrumentDetails) {
+    /*
+      notify if any UI component using it.
+      please note for Options, instrumentDetails will always be error. See OptionInstruments.jsx file
+      this is done to avoid un-neccary condition statements
+    */
+    this.props.onInstrumentSelected(instrument, instrumentDetails);
   }
 
   // react : UI to render html.
@@ -73,11 +93,11 @@ class Instruments extends React.PureComponent {
       <div className='pad-box'>
         {/*Instrument is child react component, for more details please check './InstrumentTemplates.jsx' file */ }
         <Instrument 
-          assetTypes={this.props.assetTypes ? this.props.assetTypes: AllAssetTypes  } 
+          assetTypes={this.props.assetTypes ? this.props.assetTypes : AllAssetTypes  } 
           onAssetTypeChange={this.handleAssetTypeSelection} 
           instruments={this.instruments} 
           onInstrumentChange={this.handleInstrumentSelection}
-          title='Select Instruments' >
+          title={ this.props.title ? this.props.title : 'Select Instruments'} >
           {this.props.children}
         </Instrument>
       </div>
@@ -88,7 +108,7 @@ class Instruments extends React.PureComponent {
 Instruments.propTypes = {
   onInstrumentSelected: React.PropTypes.func,
   onAssetTypeSelected: React.PropTypes.func,
-  onInstrumentPrice: React.PropTypes.func,
+  onGetInstruments: React.PropTypes.func
 };
 
 Instruments.defaultProps = {
