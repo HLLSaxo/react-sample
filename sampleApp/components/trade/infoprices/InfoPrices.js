@@ -1,97 +1,105 @@
-import React from 'react'
-import { merge, transform, toArray, uniq, forEach } from 'lodash'
-import API from '../../utils/API'
-import Details from '../../Details'
-import InstrumentTemplate from '../../ref/instruments/InstrumentTemplate'
-import InfoPricesTemplate from './InfoPricesTemplate'
+import React from 'react';
+import { merge, transform, uniq, forEach } from 'lodash';
+import { bindHandlers } from 'react-bind-handlers';
+import API from '../../utils/API';
+import Details from '../../Details';
+import OptionInstruments from '../../ref/instruments/OptionInstruments';
+import InfoPricesTemplate from './InfoPricesTemplate';
 
-export default class InfoPrices extends React.Component {
-  constructor (props) {
-    super(props)
-    this.instruments = {}
-    this.assetTypes = []
-    this.description = 'Shows how to get prices and other trade related information and keep the prices updated as events are recieved over the streaming channel.'
-    this.onInstrumentSelected = this.onInstrumentSelected.bind(this)
-    this.updateInstrumentData = this.updateInstrumentData.bind(this)
-    this.fetchInstrumentsData = this.fetchInstrumentsData.bind(this)
-    this.updateSubscribedInstruments = this.updateSubscribedInstruments.bind(this)
-    this.subscribeInstruments = this.subscribeInstruments.bind(this)
+class InfoPrices extends React.PureComponent {
+  constructor(props) {
+    super(props);
+    this.instruments = {};
+    this.assetTypes = [];
     this.state = {
       instrumentSelected: false,
       instrumentsSubscribed: false,
-      changed: false
-    }
+      changed: false,
+    };
   }
 
-  onInstrumentSelected (instrument) {
+  handleInstrumentSelected(instrument) {
+    this.setState({
+      instrumentSelected: false,
+    });
     API.getInfoPrices({
       AssetType: instrument.AssetType,
-      Uic: instrument.Identifier
-    }, this.updateInstrumentData,
-		(result) => console.log(result))
+      Uic: instrument.Identifier,
+    }, this.handleUpdateInstrumentData,
+    result => console.log(result));
   }
 
-  updateInstrumentData (data) {
-    this.instruments[data.Uic] = data
-    this.assetTypes.push(data.AssetType)
+  handleUpdateInstrumentData(data) {
+    debugger;
+    this.instruments[data.Uic] = data;
+    this.assetTypes.push(data.AssetType);
     this.setState({
-      instrumentSelected: true
-    })
+      instrumentSelected: true,
+    });
   }
 
-  updateSubscribedInstruments (instruments) {
-    const instrumentData = instruments.Data
+  handleUpdateSubscribedInstruments(instruments) {
+    const instrumentData = instruments.Data;
     forEach(instrumentData, (value, index) => {
-      merge(this.instruments[instrumentData[index].Uic], instrumentData[index])
-    })
-    this.setState({ changed: true })
+      merge(this.instruments[instrumentData[index].Uic], instrumentData[index]);
+    });
+    this.setState({
+      changed: true
+    });
   }
 
-  subscribeInstruments () {
+  handleSubscribeInstruments() {
     if (!this.state.instrumentsSubscribed) {
       forEach(uniq(this.assetTypes), (value) => {
-        const uics = transform(this.instruments, (concat, instrument) => {
+        const uics = transform(this.instruments, ((concat, instrument) => {
           if (instrument.AssetType === value) {
-            concat.uic = concat.uic ? `${concat.uic},${instrument.Uic}` : instrument.Uic
+            concat.uic = concat.uic ? `${concat.uic},${instrument.Uic}` : instrument.Uic;
           }
-        }, {})
-        API.subscribeInfoPrices({ Uics: uics.uic, AssetType: value }, this.updateSubscribedInstruments)
-      })
+        }), {});
+        API.subscribeInfoPrices({
+          Uics: uics.uic,
+          AssetType: value,
+        }, this.handleUpdateSubscribedInstruments);
+      });
       this.setState({
-        instrumentsSubscribed: true
-      })
+        instrumentsSubscribed: true,
+      });
     } else {
-      API.disposeSubscription(() => console.log('disposed subscription successfully'), () => console.log('Error disposing subscription'))
+      API.disposeSubscription(() => console.log('disposed subscription successfully'),
+        () => console.log('Error disposing subscription'));
       this.setState({
-        instrumentsSubscribed: false
-      })
+        instrumentsSubscribed: false,
+      });
     }
   }
 
-  fetchInstrumentsData () {
+  handleFetchInstrumentsData() {
     forEach(uniq(this.assetTypes), (value) => {
-      const uics = transform(this.instruments, (concat, instrument) => {
+      const uics = transform(this.instruments, ((concat, instrument) => {
         if (instrument.AssetType === value) {
-          concat.uic = concat.uic ? `${concat.uic},${instrument.Uic}` : instrument.Uic
+          concat.uic = concat.uic ? `${concat.uic},${instrument.Uic}` : instrument.Uic;
         }
-      }, {})
-      API.getInfoPricesList({ Uics: uics.uic, AssetType: value }, this.updateSubscribedInstruments)
-    })
+      }), {});
+      API.getInfoPricesList({
+        Uics: uics.uic,
+        AssetType: value,
+      }, this.handleUpdateSubscribedInstruments);
+    });
   }
 
-  highlightCell () {
-    if (this.state.changed) {
-      setTimeout(() => this.setState({ changed: false }), 1000)
-    }
-    return this.state.changed ? 'highlight' : ''
-  }
-
-  render () {
+  render() {
     return (
-      <Details Title="Info Prices" Description={this.description}>
-        <InstrumentTemplate onInstrumentSelected={this.onInstrumentSelected} />
-        <InfoPricesTemplate state={this.state} getInstrumentData={toArray(this.instruments)} subscribeInstruments={this.subscribeInstruments} fetchInstrumentsData={this.fetchInstrumentsData} />
-      </Details>
-    )
+      <div>
+        <OptionInstruments onInstrumentSelected={this.handleInstrumentSelected} />
+        <InfoPricesTemplate
+          props={this.state}
+          getInstrumentData={this.instruments}
+          handleSubscribeInstruments={this.handleSubscribeInstruments}
+          handleFetchInstrumentsData={this.handleFetchInstrumentsData}
+        />
+      </div>
+    );
   }
 }
+
+export default bindHandlers(InfoPrices);
